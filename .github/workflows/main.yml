@@ -1,0 +1,203 @@
+import React, { useState, useEffect } from 'react';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  LineElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
+
+const CashflowRechner = () => {
+  const [revenue, setRevenue] = useState('');
+  const [expenses, setExpenses] = useState('');
+  const [cashflow, setCashflow] = useState('');
+  const [history, setHistory] = useState([]);
+  const [level, setLevel] = useState(1);
+  const [points, setPoints] = useState(0);
+  const [lastLevel, setLastLevel] = useState(1);
+  const [reward, setReward] = useState('');
+
+  useEffect(() => {
+    const storedHistory = localStorage.getItem('cashflowHistory');
+    if (storedHistory) {
+      const parsedHistory = JSON.parse(storedHistory);
+      setHistory(parsedHistory);
+      updateGamification(parsedHistory);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('cashflowHistory', JSON.stringify(history));
+    updateGamification(history);
+  }, [history]);
+
+  const updateGamification = (entries) => {
+    const newPoints = entries.length * 10;
+    const newLevel = Math.floor(newPoints / 100) + 1;
+    setPoints(newPoints);
+    setLevel(newLevel);
+    
+    if (newLevel > lastLevel) {
+      setReward(`🎉 Neues Level erreicht: ${newLevel}! Du hast einen exklusiven Tipp freigeschaltet.`);
+      setLastLevel(newLevel);
+    } else {
+      setReward('');
+    }
+  };
+
+  const calculateCashflow = () => {
+    const rValue = parseFloat(revenue);
+    const eValue = parseFloat(expenses);
+
+    if (isNaN(rValue) || isNaN(eValue)) {
+      setCashflow('Bitte gib gültige Zahlen ein.');
+    } else {
+      const result = rValue - eValue;
+      const timestamp = new Date().toLocaleString();
+      const newEntry = {
+        timestamp,
+        revenue: rValue,
+        expenses: eValue,
+        cashflow: result.toFixed(2)
+      };
+      setCashflow(`Dein monatlicher Cashflow: ${result.toFixed(2)} €`);
+      setHistory([newEntry, ...history]);
+      setRevenue('');
+      setExpenses('');
+    }
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    localStorage.removeItem('cashflowHistory');
+    setPoints(0);
+    setLevel(1);
+    setLastLevel(1);
+    setReward('');
+  };
+
+  const progressToNextLevel = points % 100;
+
+  const chartData = {
+    labels: history.map(entry => entry.timestamp).reverse(),
+    datasets: [
+      {
+        label: 'Cashflow Verlauf (€)',
+        data: history.map(entry => parseFloat(entry.cashflow)).reverse(),
+        fill: false,
+        backgroundColor: '#FFD700',
+        borderColor: '#FFD700',
+        tension: 0.2,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: false,
+        ticks: {
+          color: '#fff',
+        },
+      },
+      x: {
+        ticks: {
+          color: '#fff',
+          maxRotation: 90,
+          minRotation: 45,
+        },
+      },
+    },
+  };
+
+  return (
+    <div className="bg-keschBlack text-white min-h-screen flex flex-col items-center justify-start p-4 sm:p-6">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-keschGold text-center">Cashflow Rechner</h1>
+      <p className="text-sm sm:text-base mb-2 text-center">
+        Level: <span className="text-keschGold font-bold">{level}</span> • Punkte: {points}
+      </p>
+      <div className="w-full max-w-md bg-gray-800 rounded-full h-4 mb-6">
+        <div
+          className="bg-keschGold h-4 rounded-full transition-all duration-500"
+          style={{ width: `${progressToNextLevel}%` }}
+        />
+      </div>
+
+      {reward && (
+        <div className="bg-green-600 text-white px-4 py-2 rounded mb-4 text-sm text-center">
+          {reward}
+        </div>
+      )}
+
+      <div className="bg-white text-black rounded-xl shadow-lg p-4 sm:p-6 w-full max-w-md">
+        <label htmlFor="revenue" className="block mb-2 font-semibold text-sm sm:text-base">Monatliche Einnahmen (€):</label>
+        <input
+          id="revenue"
+          type="number"
+          value={revenue}
+          onChange={(e) => setRevenue(e.target.value)}
+          className="w-full p-2 border border-gray-300 rounded mb-4 text-sm sm:text-base"
+        />
+        <label htmlFor="expenses" className="block mb-2 font-semibold text-sm sm:text-base">Monatliche Ausgaben (€):</label>
+        <input
+          id="expenses"
+          type="number"
+          value={expenses}
+          onChange={(e) => setExpenses(e.target.value)}
+          className="w-full p-2 border border-gray-300 rounded mb-4 text-sm sm:text-base"
+        />
+        <button
+          onClick={calculateCashflow}
+          className="w-full bg-keschGold text-black font-bold py-2 px-4 rounded hover:bg-yellow-400 transition-colors text-sm sm:text-base"
+        >
+          Berechnen
+        </button>
+        {cashflow && <p className="mt-4 text-center font-semibold text-sm sm:text-base">{cashflow}</p>}
+      </div>
+
+      {history.length > 0 && (
+        <>
+          <div className="mt-10 w-full max-w-md bg-white text-black rounded-xl shadow-md p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg sm:text-xl font-bold text-center w-full">Cashflow-Verlauf</h2>
+              <button
+                onClick={clearHistory}
+                className="text-xs sm:text-sm text-red-600 hover:text-red-800"
+              >
+                Verlauf löschen
+              </button>
+            </div>
+            <ul className="space-y-2 max-h-64 overflow-y-auto text-sm sm:text-base">
+              {history.map((entry, index) => (
+                <li key={index} className="border-b border-gray-300 pb-2">
+                  <div className="text-xs text-gray-600">{entry.timestamp}</div>
+                  <div>Einnahmen: {entry.revenue} €, Ausgaben: {entry.expenses} €</div>
+                  <div className="font-bold">Cashflow: {entry.cashflow} €</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="mt-10 w-full max-w-4xl bg-keschBlack p-4 rounded-xl shadow-lg" style={{ height: '400px' }}>
+            <h3 className="text-lg sm:text-xl font-bold text-keschGold mb-4 text-center">Cashflow-Entwicklung</h3>
+            <Line data={chartData} options={chartOptions} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default CashflowRechner;
